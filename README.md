@@ -1,6 +1,6 @@
 # SeaStar
 
-This is the repository for the SeaStar framework. You will find the code under /framework and the experimental data under /data.
+This is the repository for the SeaStar framework. You will find the code under [framework](https://github.com/criscod/SeaStar/tree/master/framework) and the experimental [data](https://github.com/criscod/SeaStar/tree/master/data) under /data.
 
 # Contact
 
