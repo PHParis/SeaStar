@@ -1,4 +1,4 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
 import de.unikoblenz.west.seastar.model.PropertyValue;
 
@@ -39,7 +39,7 @@ public class EntropyCalculator {
         for (double prob: probabilities)
         {
         //ln
-            double log = Math.log(prob);
+            double log = (Math.log(prob)/ Math.log(2));
             entropy = entropy - (prob * log);
         }
     return entropy;
@@ -47,10 +47,11 @@ public class EntropyCalculator {
     }
 
 
-    public double calculateEntropy(Map<String,Integer> myMap)
+    public double calculateEntropy(Map<String,Integer> myMap, boolean normalised)
     {
         double entropy=0.0;
         Integer totalI = new Integer(0);
+
 
 
         for(Map.Entry<String,Integer> e: myMap.entrySet())
@@ -73,15 +74,30 @@ public class EntropyCalculator {
 
         for (double prob: probabilities)
         {
-            //ln
-            double log = Math.log(prob);
+            //log base 2
+            double log = (Math.log(prob)/ Math.log(2.0));
             entropy = entropy - (prob * log);
         }
-        return entropy;
+
+        if(normalised && myMap.size()!=0 && myMap.size()!=1)
+        {
+           Integer size = myMap.size();
+            double cardinality = size.doubleValue();
+            double denominator = (Math.log(cardinality) / Math.log(2.0));
+
+            return (entropy / denominator);
+
+        }
+        else
+        {
+            return entropy;
+        }
+
+
 
     }
 
-    public double calculateEntropyP(Map<PropertyValue,Integer> myMap)
+    public double calculateEntropyP(Map<PropertyValue,Integer> myMap, boolean normalised)
     {
         double entropy=0.0;
         Integer totalI = new Integer(0);
@@ -107,13 +123,25 @@ public class EntropyCalculator {
 
         for (double prob: probabilities)
         {
-        //ln
-            double log = Math.log(prob);
+        //log base 2
+            double log = (Math.log(prob)/ Math.log(2.0));
             entropy = entropy - (prob * log);
         }
-        return entropy;
+        if(normalised && myMap.size()!=0 && myMap.size()!=1)
+        {
+            Integer size = myMap.size();
+            double cardinality = size.doubleValue();
+            double denominator = (Math.log(cardinality) / Math.log(2.0));
+            return (entropy / denominator);
+
+        }
+        else {
+            return entropy;
+        }
 
     }
+
+
 
 
 }

@@ -1,19 +1,16 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import de.unikoblenz.west.seastar.model.Dataset;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+
 
 /**
  * Created by csarasua.
@@ -30,11 +27,13 @@ public class P2Analyzer implements Analyzer {
 
     File m21aFile;
     File m21bFile;
+    File m21cFile;
     File m22aFile;
     File m22bFile;
-    File m23File;
+    File m22cFile;
 
-    private static final Logger log = LoggerFactory.getLogger(P2Analyzer.class);
+
+    private static final Logger log = LogManager.getLogger(P2Analyzer.class);
 
 
     EntropyCalculator ec;
@@ -43,18 +42,13 @@ public class P2Analyzer implements Analyzer {
     String workingDirForFileName;
 
 
-    public P2Analyzer(Dataset dataset)
+    public P2Analyzer(Dataset dataset, String typelinks)
     {
 
         this.dataset=dataset;
         ec = new EntropyCalculator();
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
 
-        Marker m = MarkerFactory.getMarker("debug");
-        log.isDebugEnabled(m);
 
 
         workingDir = System.getProperty("user.dir");
@@ -62,11 +56,13 @@ public class P2Analyzer implements Analyzer {
 
 
 
-        m21aFile = new File(workingDirForFileName + "/output/m21aFile_"+ dataset.getTitle()+".tsv");
-        m21bFile = new File(workingDirForFileName + "/output/m21bFile_"+ dataset.getTitle()+".tsv");
-        m22aFile = new File(workingDirForFileName + "/output/m22aFile_"+ dataset.getTitle()+".tsv");
-        m22bFile = new File(workingDirForFileName + "/output/m22bFile_"+ dataset.getTitle()+".tsv");
-        m23File = new File(workingDirForFileName + "/output/m23File_"+ dataset.getTitle()+".tsv");
+        m21aFile = new File(workingDirForFileName + "/output/m21aFile_"+dataset.getTitle()+"_"+typelinks+".tsv");
+        m21bFile = new File(workingDirForFileName + "/output/m21bFile_"+dataset.getTitle()+"_"+typelinks+".tsv");
+        m21cFile = new File(workingDirForFileName + "/output/m21cFile_"+dataset.getTitle()+"_"+typelinks+".tsv");
+        m22aFile = new File(workingDirForFileName + "/output/m22aFile_"+ dataset.getTitle()+"_"+typelinks+".tsv");
+        m22bFile = new File(workingDirForFileName + "/output/m22bFile_"+ dataset.getTitle()+"_"+typelinks+".tsv");
+        m22cFile = new File(workingDirForFileName + "/output/m22cFile_"+ dataset.getTitle()+"_"+typelinks+".tsv");
+
 
         String ls = System.getProperty("line.separator");
 
@@ -78,8 +74,14 @@ public class P2Analyzer implements Analyzer {
 
             Files.write("", m21bFile, Charsets.UTF_8);
             //writes header of result file
-            Files.append("entity" + "\t" +"typeentity" + "\t"+"diffentropy", m21bFile, Charsets.UTF_8);
+            Files.append("entity" + "\t" +"typeentity" + "\t"+"diffratio", m21bFile, Charsets.UTF_8);
             Files.append(ls, m21bFile, Charsets.UTF_8);
+
+            Files.write("", m21cFile, Charsets.UTF_8);
+            //writes header of result file
+            Files.append("entity" + "\t" +"typeentity" + "\t"+"diffentropy"+ "\t"+"diffNentropy", m21cFile, Charsets.UTF_8);
+            Files.append(ls, m21cFile, Charsets.UTF_8);
+
 
             Files.write("", m22aFile, Charsets.UTF_8);
             //writes header of result file
@@ -88,13 +90,15 @@ public class P2Analyzer implements Analyzer {
 
             Files.write("", m22bFile, Charsets.UTF_8);
             //writes header of result file
-            Files.append("entity" + "\t" +"typeentity" + "\t"+"diffentropy", m22bFile, Charsets.UTF_8);
+            Files.append("entity" + "\t" +"typeentity" + "\t"+"diffratio", m22bFile, Charsets.UTF_8);
             Files.append(ls, m22bFile, Charsets.UTF_8);
 
-            Files.write("", m23File, Charsets.UTF_8);
+            Files.write("", m22cFile, Charsets.UTF_8);
             //writes header of result file
-            Files.append("entity" + "\t" +"typeentity" + "\t"+"preds", m23File, Charsets.UTF_8);
-            Files.append(ls, m23File, Charsets.UTF_8);
+            Files.append("entity" + "\t" +"typeentity" + "\t"+"diffentropy"+ "\t"+"diffNentropy", m22cFile, Charsets.UTF_8);
+            Files.append(ls, m22cFile, Charsets.UTF_8);
+
+
         } catch (IOException e) {
             e.printStackTrace();
             log.error("error writing files ", e);
@@ -103,11 +107,13 @@ public class P2Analyzer implements Analyzer {
 
     public void analyzeLinks(String entity, String entityType)
     {
-            m21a(entity,entityType);
+          // m21a(entity,entityType);
             m21b(entity,entityType);
-            m22a(entity,entityType);
+          // m21c(entity,entityType);
+         // m22a(entity,entityType);
             m22b(entity,entityType);
-            m23(entity,entityType);
+         //  m22c(entity,entityType);
+
 
 
 
@@ -131,16 +137,45 @@ public class P2Analyzer implements Analyzer {
     }
     private void m21b(String entity, String entityType)
     {
-        double entropyTargets = ec.calculateEntropy(targetMap);
-        double entropyTargetsPrime = ec.calculateEntropy(targetMapPrime);
-        double diffDataset = entropyTargetsPrime-entropyTargets;
+        MapDifference<String,Integer> difference = Maps.difference(this.targetMap,this.targetMapPrime);
+        int countNewTargets = difference.entriesOnlyOnRight().size();
+        int countOriginalTargets = difference.entriesInCommon().size()+difference.entriesDiffering().size();
+        double diffTargetRatio=0;
+        if(countOriginalTargets!=0)
+        {
+            diffTargetRatio= countNewTargets / countOriginalTargets;
+        }
+        else
+        {diffTargetRatio= 1.0;}
+
 
 
         try {
 
-            Files.append(entity+"\t"+entityType+"\t"+diffDataset+"\t", m21bFile, Charsets.UTF_8);
+            Files.append(entity+"\t"+entityType+"\t"+diffTargetRatio, m21bFile, Charsets.UTF_8);
             String ls = System.getProperty("line.separator");
             Files.append(ls , m21bFile, Charsets.UTF_8);
+        } catch (IOException e) {
+            log.error("problem when writing in connectivity increase output", e);
+        }
+
+
+    }
+    private void m21c(String entity, String entityType)
+    {
+        double entropyTargets = ec.calculateEntropy(targetMap,true);
+        double entropyTargetsPrime = ec.calculateEntropy(targetMapPrime,true);
+        double diffNEntropyDataset = entropyTargetsPrime-entropyTargets;
+        entropyTargets = ec.calculateEntropy(targetMap,false);
+        entropyTargetsPrime = ec.calculateEntropy(targetMapPrime,false);
+        double diffEntropyDataset = entropyTargetsPrime-entropyTargets;
+
+
+        try {
+
+            Files.append(entity+"\t"+entityType+"\t"+diffEntropyDataset+"\t"+diffNEntropyDataset, m21cFile, Charsets.UTF_8);
+            String ls = System.getProperty("line.separator");
+            Files.append(ls , m21cFile, Charsets.UTF_8);
         } catch (IOException e) {
             log.error("problem when writing in connectivity increase output", e);
         }
@@ -159,17 +194,48 @@ public class P2Analyzer implements Analyzer {
             log.error("problem when writing in connectivity increase output", e);
         }
     }
+
     private void m22b(String entity, String entityType)
     {
-        double entropyDataset = ec.calculateEntropy(datasetMap);
-        double entropyDatasetPrime = ec.calculateEntropy(datasetMapPrime);
-        double diffDataset = entropyDatasetPrime-entropyDataset;
+        MapDifference<String,Integer> difference = Maps.difference(this.datasetMap,this.datasetMapPrime);
+        int countNewDatasets = difference.entriesOnlyOnRight().size();
+        int countOriginalDatasets = difference.entriesInCommon().size()+difference.entriesDiffering().size();
+        double diffDatasetsRatio=0;
+        if(countOriginalDatasets!=0)
+        {
+            diffDatasetsRatio= countNewDatasets / countOriginalDatasets;
+        }
+        else
+        {
+            diffDatasetsRatio= 1.0;
+        }
+
 
         try {
 
-            Files.append(entity+"\t"+entityType+"\t"+diffDataset+"\t", m22bFile, Charsets.UTF_8);
+            Files.append(entity+"\t"+entityType+"\t"+diffDatasetsRatio+"\t", m22bFile, Charsets.UTF_8);
             String ls = System.getProperty("line.separator");
             Files.append(ls , m22bFile, Charsets.UTF_8);
+        } catch (IOException e) {
+            log.error("problem when writing in connectivity increase output", e);
+        }
+
+
+    }
+    private void m22c(String entity, String entityType)
+    {
+        double entropyDataset = ec.calculateEntropy(datasetMap,true);
+        double entropyDatasetPrime = ec.calculateEntropy(datasetMapPrime,true);
+        double diffNEntropyDataset = entropyDatasetPrime-entropyDataset;
+        entropyDataset = ec.calculateEntropy(datasetMap,false);
+        entropyDatasetPrime = ec.calculateEntropy(datasetMapPrime,false);
+        double diffEntropyDataset = entropyDatasetPrime-entropyDataset;
+
+        try {
+
+            Files.append(entity+"\t"+entityType+"\t"+diffEntropyDataset+"\t"+diffNEntropyDataset, m22cFile, Charsets.UTF_8);
+            String ls = System.getProperty("line.separator");
+            Files.append(ls , m22cFile, Charsets.UTF_8);
         } catch (IOException e) {
             log.error("problem when writing in connectivity increase output", e);
         }
@@ -252,11 +318,5 @@ public class P2Analyzer implements Analyzer {
         this.m22bFile = m22bFile;
     }
 
-    public File getM23File() {
-        return m23File;
-    }
 
-    public void setM23File(File m23File) {
-        this.m23File = m23File;
-    }
 }

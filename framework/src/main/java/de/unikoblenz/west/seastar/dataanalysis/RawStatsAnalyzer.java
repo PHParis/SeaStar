@@ -1,4 +1,4 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
 /**
  * Created by csarasua.
@@ -6,6 +6,6 @@ package de.unikoblenz.west.seastar.controller.dataanalysis;
 public interface RawStatsAnalyzer {
 
     //datasetPLD
-    public void computeStats(String datasetName);
+    public void computeStats(String datasetName,  String namespace);
     public void closeOpenConnections();
 }

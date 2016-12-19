@@ -1,27 +1,22 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
 import de.unikoblenz.west.seastar.model.Dataset;
 import de.unikoblenz.west.seastar.utils.ConfigurationManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+
 
 /**
  * Created by csarasua.
  */
 public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
 
-    private static final Logger log = LoggerFactory.getLogger(DescriptiveStatsAnalyzer.class);
+    private static final Logger log = LogManager.getLogger(DescriptiveStatsAnalyzer.class);
 
     Connection connect;
 
@@ -31,14 +26,16 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
     String workingDir;
     String workingDirForFileName;
 
-    public DescriptiveStatsAnalyzer(Dataset dataset)
+    String typelinks;
+
+    public DescriptiveStatsAnalyzer(Dataset dataset, String typelinks)
     {
         workingDir = System.getProperty("user.dir");
         workingDirForFileName = workingDir.replace("\\", "/");
 
-
-        basicStatsOutputFile = new File(workingDirForFileName + "/output/basicStats_"+dataset.getTitle()+".tsv");
-        logErrorsLinks = new File(workingDirForFileName +"/output/error_basicStats_"+dataset.getTitle()+".tsv");
+        this.typelinks=typelinks;
+        basicStatsOutputFile = new File(workingDirForFileName + "/output/basicStats_"+dataset.getTitle()+"_"+typelinks+".tsv");
+        logErrorsLinks = new File(workingDirForFileName +"/output/error_basicStats_"+dataset.getTitle()+"_"+typelinks+".tsv");
 
         try {
             String ls = System.getProperty("line.separator");
@@ -57,12 +54,6 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
             log.info("problem connecting into the database ",e);
         }
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
-
-        Marker m = MarkerFactory.getMarker("debug");
-        log.isDebugEnabled(m);
 
 
         try {
@@ -74,18 +65,24 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
         }
 
     }
-    public void computeStats(String dataset)
+    public void computeStats(String dataset,  String namespace)
     {
         Statement statement = null;
         Statement statement2=null;
         PreparedStatement pStatement=null;
 
+
+
         try{
         // M1, M2
-        String sql2 = "SELECT COUNT(distinct id) AS countl, COUNT(distinct source) as counte FROM starfish.pickeduplinks WHERE datasetspld LIKE ? AND source LIKE ?";
+        String sql2 = "SELECT COUNT(distinct id) AS countl, COUNT(distinct source) as counte FROM starfish.alllinks WHERE datasetspld=? AND datasetcpld=? AND datasettpld<>? AND typelink=? ";
         pStatement = connect.prepareStatement(sql2);
-        pStatement.setString(1, "%"+dataset+"%");
-        pStatement.setString(2, "%"+dataset+"%");
+        pStatement.setString(1, namespace);
+        pStatement.setString(2, namespace);
+        pStatement.setString(3, namespace);
+        pStatement.setString(4, typelinks);
+        //pStatement.setString(1, "%"+dataset+"%");
+       //pStatement.setString(2, "%"+dataset+"%");
 
         ResultSet rs2 = pStatement.executeQuery();
         if (rs2.next()) {
@@ -100,10 +97,12 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
 
 
         // M3 linksets
-        sql2 = "SELECT C.predicate, C.co FROM (SELECT predicate, COUNT(distinct id) AS co FROM starfish.pickeduplinks WHERE datasetspld LIKE ? AND source LIKE ? GROUP BY predicate) AS C";
+        sql2 = "SELECT C.predicate, C.co FROM (SELECT predicate, COUNT(distinct id) AS co FROM starfish.alllinks WHERE datasetspld=? AND datasetcpld=? AND datasettpld<>? AND typelink=? GROUP BY predicate) AS C";
         pStatement = connect.prepareStatement(sql2);
-        pStatement.setString(1, "%"+dataset+"%");
-        pStatement.setString(2, "%"+dataset+"%");
+            pStatement.setString(1, namespace);
+            pStatement.setString(2, namespace);
+            pStatement.setString(3, namespace);
+            pStatement.setString(4, typelinks);
 
 
             rs2 = pStatement.executeQuery();
@@ -122,10 +121,12 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
         }
 
         // M4 - M5
-        sql2 = "SELECT AVG(C.co)FROM (SELECT COUNT(distinct target) AS co FROM starfish.pickeduplinks WHERE datasetspld LIKE ? AND source LIKE ? GROUP BY source) AS C";
+        sql2 = "SELECT AVG(C.co)FROM (SELECT COUNT(distinct target) AS co FROM starfish.alllinks WHERE datasetspld=? AND datasetcpld=? AND datasettpld<>? AND typelink=? GROUP BY source) AS C";
         pStatement = connect.prepareStatement(sql2);
-        pStatement.setString(1, "%"+dataset+"%");
-        pStatement.setString(2, "%"+dataset+"%");
+            pStatement.setString(1, namespace);
+            pStatement.setString(2, namespace);
+           pStatement.setString(3, namespace);
+            pStatement.setString(4, typelinks);
 
 
             rs2 = pStatement.executeQuery();
@@ -140,10 +141,12 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
         }
 
 
-        sql2 = "SELECT AVG(C.co)FROM (SELECT COUNT(distinct id) AS co FROM starfish.pickeduplinks WHERE datasetspld LIKE ? AND source LIKE ? GROUP BY source) AS C";
+        sql2 = "SELECT AVG(C.co)FROM (SELECT COUNT(distinct id) AS co FROM starfish.alllinks WHERE datasetspld=? AND datasetcpld=? AND datasettpld<>? AND typelink=? GROUP BY source) AS C";
         pStatement = connect.prepareStatement(sql2);
-        pStatement.setString(1, "%"+dataset+"%");
-        pStatement.setString(2, "%"+dataset+"%");
+            pStatement.setString(1, namespace);
+            pStatement.setString(2, namespace);
+            pStatement.setString(3, namespace);
+            pStatement.setString(4, typelinks);
 
 
             rs2 = pStatement.executeQuery();
@@ -172,6 +175,7 @@ public class DescriptiveStatsAnalyzer implements RawStatsAnalyzer{
 
 } catch (SQLException e) {
         log.error("Error executing queries against the data base in basic descriptive stats ", e);
+
         }
         finally{
         try {

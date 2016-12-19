@@ -1,8 +1,9 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 import de.unikoblenz.west.seastar.model.Dataset;
 import de.unikoblenz.west.seastar.model.TypeOfDatasetLocation;
-import de.unikoblenz.west.seastar.trash.BasicDescriptiveStatsAnalyzer;
 import de.unikoblenz.west.seastar.utils.Constants;
 import de.unikoblenz.west.seastar.utils.URIUtils;
 import org.apache.commons.io.IOUtils;
@@ -17,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -28,14 +30,23 @@ public class EntityManager {
 
     Dataset dataset;
 
-    private static final Logger log = LoggerFactory.getLogger(BasicDescriptiveStatsAnalyzer.class);
+    private static final Logger log = LoggerFactory.getLogger(EntityManager.class);
 
+    String workingDir;
+    String workingDirForFileName;
+
+
+    File nonDerefFile;
 
 
     public EntityManager(Dataset dataset){
 
+        workingDir = System.getProperty("user.dir");
+        workingDirForFileName = workingDir.replace("\\", "/");
 
         this.dataset=dataset;
+        this.nonDerefFile = new File(workingDirForFileName + "/output/nondereferenceableURIs.tsv");
+
     }
 
 
@@ -48,36 +59,49 @@ public class EntityManager {
         ResultSet results=null;
         QueryExecution qexec=null;
         QuerySolution qs=null;
+try {
+    String queryString = "SELECT * WHERE{<" + entity + "> ?predicate ?object}";
 
-        String queryString="SELECT * WHERE{<"+entity+"> ?predicate ?object}";
-
-         if (this.dataset.getTypeOfLocation().equals(TypeOfDatasetLocation.SPARQLENDPOINT)) {
-
-
-         Query query = QueryFactory.create(queryString);
-         qexec = QueryExecutionFactory.sparqlService(this.dataset.getLocation(), query);
-
-         results = qexec.execSelect();
-         }
-         else if (this.dataset.getTypeOfLocation().equals(TypeOfDatasetLocation.FILEDUMP)) {
-         qexec = QueryExecutionFactory.create(queryString, this.dataset.getModel());
-         results = qexec.execSelect();
-
-         }
+    if (this.dataset.getTypeOfLocation().equals(TypeOfDatasetLocation.SPARQLENDPOINT)) {
 
 
-         while (results.hasNext()) {
-         qs = results.nextSolution();
+        Query query = QueryFactory.create(queryString);
+        qexec = QueryExecutionFactory.sparqlService(this.dataset.getLocation(), query);
 
-         Resource pred = qs.getResource("predicate");
-         Property predicate = resultModel.createProperty(pred.getURI());
+        results = qexec.execSelect();
+    } else if (this.dataset.getTypeOfLocation().equals(TypeOfDatasetLocation.FILEDUMP) && this.dataset.getDataset() == null) {
+        qexec = QueryExecutionFactory.create(queryString, this.dataset.getModel());
+        results = qexec.execSelect();
 
-         RDFNode object = qs.get("object");
-         entityResource.addProperty(predicate,object);
+    } else if (this.dataset.getTypeOfLocation().equals(TypeOfDatasetLocation.FILEDUMP)) {
+        //was big and loaded into a jena query dataset
+        qexec = QueryExecutionFactory.create(queryString, this.dataset.getDataset()); //TODO:merge
+        results = qexec.execSelect();
+    } else if (this.dataset.getTypeOfLocation().equals(TypeOfDatasetLocation.FILEDUMP_NQ)) {
 
-         }
+        queryString = "SELECT * WHERE{GRAPH ?g{<" + entity + "> ?predicate ?object}}";
+        qexec = QueryExecutionFactory.create(queryString, this.dataset.getDataset());
+        results = qexec.execSelect();
+    }
 
-        return resultModel;
+
+    while (results.hasNext()) {
+        qs = results.nextSolution();
+
+        Resource pred = qs.getResource("predicate");
+        Property predicate = resultModel.createProperty(pred.getURI());
+
+        RDFNode object = qs.get("object");
+        entityResource.addProperty(predicate, object);
+
+    }
+}catch(Exception e)
+{
+    log.error("exception when querying for the model of an entity in the dataset");
+}
+        finally {
+    return resultModel;
+}
 
 
 
@@ -90,7 +114,9 @@ public class EntityManager {
 
          // remove
         // links existing in the description - not rdf:type statements there
-        StmtIterator stIt = resultModel.listStatements();
+
+       //resultModel.listStatements();
+        StmtIterator stIt = inputSourceModel.listStatements();
         while(stIt.hasNext())
         {
             Statement st =  stIt.next();
@@ -173,8 +199,11 @@ public class EntityManager {
      */
 
 
-    public Model getEntityModelDeref(String URI)
+    public Model getEntityModelDeref(String URI, String sourceURIofLink)
     {
+
+        String ls = System.getProperty("line.separator");
+
 
         Model m = ModelFactory.createDefaultModel();
         Model m2 = ModelFactory.createDefaultModel();
@@ -208,7 +237,7 @@ public class EntityManager {
                     if (responseAsString.contains("<rdf:RDF")) // in the target we may have URLs as value, which are not RDF resources
 
                     {
-                        System.out.println("URI: " + rdfUri);
+                      //  System.out.println("URI: " + rdfUri);
                         try {
                             m.read(in, "RDF/XML");
                         }
@@ -220,10 +249,15 @@ public class EntityManager {
 
 
 
-                        System.out.println("URI of entity whose model is being looked up: " + URI);
+                       // log.info("URI of entity whose model is being looked up: " + URI);
                         m2 = getOriginalModel(m);
                     }
 
+                }
+                else
+                {
+                    Files.append(System.currentTimeMillis()+" : with source "+sourceURIofLink+" the target entity "+URI+" was looked up and the HTTP URI look up did not give a 200, but a "+statusCode,nonDerefFile, Charsets.UTF_8);
+                    Files.append(ls,nonDerefFile,Charsets.UTF_8);
                 }
             }
             catch (IOException e) {
@@ -277,14 +311,15 @@ public class EntityManager {
             }
 
 
-            if(object.isURIResource() && !object.toString().startsWith("mailto"))
+            if(object.isURIResource() && object.toString().startsWith("http://"))
             {
+                //!object.toString().startsWith("mailto")&& !object.toString().startsWith("urn:")
                 pldObject = URIUtils.pld(object.asResource().getURI());
             }
 
             if(pldSubject!=null && pldObject!=null &&!pldSubject.equals(pldObject)&& !st.getPredicate().equals(Constants.NS_RDF+"type"))
             {
-                // then remove from "original description because it is a link"
+                // then remove from "original description" because it is a link
                 m2.remove(st);
             }
 

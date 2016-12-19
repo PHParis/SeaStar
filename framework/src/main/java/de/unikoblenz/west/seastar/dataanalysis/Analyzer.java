@@ -1,4 +1,4 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
 /**
  * Created by csarasua.

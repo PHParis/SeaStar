@@ -1,21 +1,19 @@
-package de.unikoblenz.west.seastar.controller.dataanalysis;
+package de.unikoblenz.west.seastar.dataanalysis;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import de.unikoblenz.west.seastar.model.Dataset;
 import de.unikoblenz.west.seastar.model.PropertyValue;
 import de.unikoblenz.west.seastar.utils.URIUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
+
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Created by csarasua.
@@ -34,10 +32,11 @@ public class P3Analyzer implements Analyzer {
 
     File m31aFile;
     File m31bFile;
+    File m31cFile;
     File m32File;
 
 
-    private static final Logger log = LoggerFactory.getLogger(P3Analyzer.class);
+    private static final Logger log = LogManager.getLogger(P3Analyzer.class);
 
 
     EntropyCalculator ec;
@@ -47,28 +46,24 @@ public class P3Analyzer implements Analyzer {
 
 
 
-    public P3Analyzer(Dataset dataset)
+    public P3Analyzer(Dataset dataset, String typelinks)
     {
 
 
         this.dataset=dataset;
         ec = new EntropyCalculator();
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
 
-        Marker m = MarkerFactory.getMarker("debug");
-        log.isDebugEnabled(m);
 
 
         workingDir = System.getProperty("user.dir");
         workingDirForFileName = workingDir.replace("\\", "/");
 
 
-        m31aFile = new File(workingDirForFileName + "/output/m31aFile_"+ dataset.getTitle()+".tsv");
-        m31bFile = new File(workingDirForFileName + "/output/m31bFile_"+ dataset.getTitle()+".tsv");
-        m32File = new File(workingDirForFileName + "/output/m32File_"+ dataset.getTitle()+".tsv");
+        m31aFile = new File(workingDirForFileName + "/output/m31aFile_"+ dataset.getTitle()+"_"+typelinks+".tsv");
+        m31bFile = new File(workingDirForFileName + "/output/m31bFile_"+ dataset.getTitle()+"_"+typelinks+".tsv");
+        m31cFile = new File(workingDirForFileName + "/output/m31cFile_"+ dataset.getTitle()+"_"+typelinks+".tsv");
+
 
         String ls = System.getProperty("line.separator");
 
@@ -81,13 +76,20 @@ public class P3Analyzer implements Analyzer {
 
         Files.write("", m31bFile, Charsets.UTF_8);
         //writes header of result file
-        Files.append("entity" + "\t" +"typeentity" + "\t"+"diffentropy", m31bFile, Charsets.UTF_8);
+        Files.append("entity" + "\t" +"typeentity" + "\t"+"diffratio", m31bFile, Charsets.UTF_8);
         Files.append(ls, m31bFile, Charsets.UTF_8);
 
-        Files.write("", m32File, Charsets.UTF_8);
+        Files.write("", m31cFile, Charsets.UTF_8);
+        //writes header of result file
+        Files.append("entity" + "\t" +"typeentity" + "\t"+"diffentropy"+ "\t"+"diffNentropy", m31cFile, Charsets.UTF_8);
+        Files.append(ls, m31cFile, Charsets.UTF_8);
+
+
+
+        /*Files.write("", m32File, Charsets.UTF_8);
         //writes header of result file
         Files.append("entity" + "\t" +"typeentity" + "\t"+"preds", m32File, Charsets.UTF_8);
-        Files.append(ls, m32File, Charsets.UTF_8);
+        Files.append(ls, m32File, Charsets.UTF_8);*/
         } catch (IOException e) {
             e.printStackTrace();
             log.error("error writing files ", e);
@@ -96,10 +98,12 @@ public class P3Analyzer implements Analyzer {
 
     public void analyzeLinks(String entity, String entityType)
     {
-        m31a(entity,entityType);
+       // m31a(entity,entityType);
         m31b(entity, entityType);
+        //m31c(entity, entityType);
 
-        m32(entity, entityType);
+
+
 
     }
     private void m31a(String entity, String entityType)
@@ -115,26 +119,55 @@ public class P3Analyzer implements Analyzer {
             log.error("problem when writing in description increase output", e);
         }
     }
+
     private void m31b(String entity, String entityType)
     {
-        double entropyVocabsDesc = ec.calculateEntropy(vocabDescMap);
-        double entropyVocabsDescPrime = ec.calculateEntropy(vocabDescMapPrime);
-        double diffVocab = entropyVocabsDescPrime - entropyVocabsDesc;
+
+        MapDifference<String,Integer> difference = Maps.difference(this.vocabDescMap,this.vocabDescMapPrime);
+        int countNewDatasets = difference.entriesOnlyOnRight().size();
+        int countOriginalDatasets = difference.entriesInCommon().size()+difference.entriesDiffering().size();
+        double diffVocabsRatio=0;
+        if(countOriginalDatasets!=0)
+        {
+            diffVocabsRatio = countNewDatasets / countOriginalDatasets;
+        }
+        else
+        {
+            diffVocabsRatio = 1.0;
+        }
+
 
         try {
 
-            Files.append(entity+"\t"+entityType+"\t"+diffVocab+"\t", m31bFile, Charsets.UTF_8);
+            Files.append(entity+"\t"+entityType+"\t"+diffVocabsRatio+"\t", m31bFile, Charsets.UTF_8);
             String ls = System.getProperty("line.separator");
             Files.append(ls , m31bFile, Charsets.UTF_8);
         } catch (IOException e) {
             log.error("problem when writing in description increase output", e);
         }
-
     }
-    private void m32(String entity, String entityType)
+
+
+    private void m31c(String entity, String entityType)
     {
+        double entropyVocabsDesc = ec.calculateEntropy(vocabDescMap,true);
+        double entropyVocabsDescPrime = ec.calculateEntropy(vocabDescMapPrime,true);
+        double diffNEntropyVocab = entropyVocabsDescPrime - entropyVocabsDesc;
+        entropyVocabsDesc = ec.calculateEntropy(vocabDescMap,false);
+        entropyVocabsDescPrime = ec.calculateEntropy(vocabDescMapPrime,false);
+        double diffEntropyVocab = entropyVocabsDescPrime - entropyVocabsDesc;
+
+        try {
+
+            Files.append(entity+"\t"+entityType+"\t"+diffEntropyVocab+"\t"+diffNEntropyVocab, m31cFile, Charsets.UTF_8);
+            String ls = System.getProperty("line.separator");
+            Files.append(ls , m31cFile, Charsets.UTF_8);
+        } catch (IOException e) {
+            log.error("problem when writing in description increase output", e);
+        }
 
     }
+
 
     public Dataset getDataset() {
         return dataset;
@@ -202,5 +235,13 @@ public class P3Analyzer implements Analyzer {
 
     public static Logger getLog() {
         return log;
+    }
+
+    public File getM31cFile() {
+        return m31cFile;
+    }
+
+    public void setM31cFile(File m31cFile) {
+        this.m31cFile = m31cFile;
     }
 }
