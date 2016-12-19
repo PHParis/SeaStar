@@ -8,17 +8,14 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.RiotException;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -38,7 +35,7 @@ public class LDCrawlDataSelection {
 
     Dataset dataset;
 
-    private static final Logger log = LoggerFactory.getLogger(LDCrawlDataSelection.class);
+    private static final Logger log = LogManager.getLogger(LDCrawlDataSelection.class);
 
 
 
@@ -53,9 +50,7 @@ public class LDCrawlDataSelection {
 
         this.filePath = pathD;
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
+
 
         this.filePath = pathD;
         this.outputFilePath = pathSD;

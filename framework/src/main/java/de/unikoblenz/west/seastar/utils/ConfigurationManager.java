@@ -9,6 +9,7 @@ import java.io.File;
  */
 public class ConfigurationManager {
 
+    // v1.10 was Configuration config = new PropertiesConfigurazion(workingDir+"/config.properties");
     private Configuration config;
 
     static private ConfigurationManager singleton;
@@ -18,8 +19,13 @@ public class ConfigurationManager {
         try {
 
             String workingDir = System.getProperty("user.dir");
-            File f = new File(workingDir + "/config.properties");
-            config = new PropertiesConfiguration(f);
+
+            //File f = new File(workingDir + "/config.properties");
+            //config = new PropertiesConfiguration(f);
+
+
+            config = new PropertiesConfiguration("config.properties");
+
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -51,4 +57,7 @@ public class ConfigurationManager {
     {return this.config.getString("db.username");}
     public String getDBPassword()
     {return this.config.getString("db.password");}
+
+    public String getDataDirectoryPath()
+    {return this.config.getString("datadirectory");}
 }

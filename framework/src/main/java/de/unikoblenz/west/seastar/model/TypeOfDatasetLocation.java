@@ -5,6 +5,6 @@ package de.unikoblenz.west.seastar.model;
 public enum TypeOfDatasetLocation {
 
 
-    SPARQLENDPOINT, FILEDUMP;
+    SPARQLENDPOINT, FILEDUMP, FILEDUMP_NQ;
 
 }

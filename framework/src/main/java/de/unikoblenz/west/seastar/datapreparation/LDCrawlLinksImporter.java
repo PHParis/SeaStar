@@ -2,15 +2,13 @@ package de.unikoblenz.west.seastar.datapreparation;
 
 import de.unikoblenz.west.seastar.utils.ConfigurationManager;
 import de.unikoblenz.west.seastar.utils.Constants;
+import de.unikoblenz.west.seastar.utils.URIUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.net.URI;
@@ -18,8 +16,7 @@ import java.sql.*;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+
 import java.util.zip.ZipFile;
 
 /**
@@ -31,12 +28,15 @@ import java.util.zip.ZipFile;
 public class LDCrawlLinksImporter implements LinkImporter{
 
 
-    private static final Logger log = LoggerFactory.getLogger(LDCrawlLinksImporter.class);
+    private static final Logger log = LogManager.getLogger(LDCrawlLinksImporter.class);
 
+    long counter=0;
 
     String linksFilePath;
     String catalogueFilePath;
-    String outputFilePath;
+
+    PreparedStatement statement = null;
+
     Connection connect;
 
     Map<String,String> datasets = new HashMap<String,String>();
@@ -46,17 +46,14 @@ public class LDCrawlLinksImporter implements LinkImporter{
     /**
      * @param pathLinks     path of input file containing the links to be processed
      * @param pathCatalogue path of input file containing the information about the data catalogue (name of data sets and pay level domains)
-     * @param pathOutput    path of output file
+     *
      */
-    public LDCrawlLinksImporter(String pathLinks, String pathCatalogue, String pathOutput) {
+    public LDCrawlLinksImporter(String pathLinks, String pathCatalogue) {
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
 
         this.linksFilePath = pathLinks;
         this.catalogueFilePath = pathCatalogue;
-        this.outputFilePath = pathOutput;
+
 
 
         try {
@@ -77,9 +74,6 @@ public class LDCrawlLinksImporter implements LinkImporter{
     }
     public LDCrawlLinksImporter ()
     {
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
 
 
 
@@ -105,6 +99,8 @@ public void closeConnections()
 
     public void loadDatasetCatalogue() {
 
+        URIUtils.loadDatasetCatalogue();
+        /*
         Reader in = null;
         try {
             in = new FileReader(this.catalogueFilePath);
@@ -120,7 +116,7 @@ public void closeConnections()
         for (CSVRecord record : records) {
 
 
-            Marker m = MarkerFactory.getMarker("debug");
+
             //log.isDebugEnabled(m);
             //log.info("logging on");
 
@@ -134,6 +130,8 @@ public void closeConnections()
             insertDataset(datasetPLD, category);
 
         }
+        */
+
     }
 
     private void insertDataset(String pld, String category) {
@@ -254,7 +252,7 @@ public void closeConnections()
     }*/
 
     private void insertLink(String s, String p, String o, String c,  Connection connect) {
-        PreparedStatement statement = null;
+
 
 
         try {
@@ -310,18 +308,29 @@ public void closeConnections()
 
 
             //String sql = "INSERT INTO links(source,predicate,target, datasets,typelink) VALUES ('" + s + "','" + p + "','" + o + "','"+ c + "','" + type + "')";
-            String sql = "INSERT INTO alllinks(source,predicate,target, datasets,typelink, datasetspld, datasettpld) VALUES (?,?,?,?,?,?,?)";
-            statement = connect.prepareStatement(sql);
             statement.setString(1, s);
             statement.setString(2, p);
             statement.setString(3, o);
             statement.setString(4, c);
             statement.setString(5, type);
-            String datasetspld = pld(s);
-            String datasettpld = pld(o);
+            String datasetspld = URIUtils.pld(s);
+            String datasettpld = URIUtils.pld(o);
+            String datasetcpld = URIUtils.pld(c);
             statement.setString(6, datasetspld);
             statement.setString(7, datasettpld);
-            statement.executeUpdate();
+            statement.setString(8, datasetcpld);
+
+            statement.addBatch();
+            counter++;
+
+            if (counter % 1000 == 0) {
+                statement.executeBatch();
+                connect.commit();
+
+                statement.clearBatch();
+                statement.clearParameters();
+            }
+            //statement.executeUpdate();
 
             //log.info(sql);
 
@@ -331,15 +340,13 @@ public void closeConnections()
 
             log.info("problem inserting links " + e.getMessage().toString() + e.getStackTrace());
             log.info("subject was "+s+" predicate was "+p+" object was "+o);
-        }
-        finally
-        {
             try {
-                statement.close();
-            } catch (SQLException e) {
-                e.printStackTrace();
+                connect.rollback();
+            } catch (SQLException e1) {
+                e1.printStackTrace();
             }
         }
+
 
 
     }
@@ -514,30 +521,43 @@ public void closeConnections()
 
         try {
 
-            Marker m = MarkerFactory.getMarker("debug");
-            log.isDebugEnabled(m);
+
             // log.info("logging on");
-
-
-            ZipFile zip = null;
-            try {
-                zip = new ZipFile(this.linksFilePath);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            //TODO: files path
             InputStream in = null;
-            try {
-                in = zip.getInputStream(zip.getEntry("links.nq"));
-            } catch (IOException e) {
-                e.printStackTrace();
+            if(this.linksFilePath.endsWith(".zip")) {
+                ZipFile zip = null;
+                try {
+                    zip = new ZipFile(this.linksFilePath);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                //TODO: files path
+
+                try {
+                    in = zip.getInputStream(zip.getEntry("links.nq"));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
+            else if(this.linksFilePath.endsWith(".nq"))
+            {
+               try {
+                   in = new FileInputStream(this.linksFilePath);
+               }
+               catch (IOException e) {
+                   e.printStackTrace();
+               }
+            }
+
+            String sql = "INSERT INTO alllinks(source,predicate,target, datasets,typelink, datasetspld, datasettpld,datasetcpld) VALUES (?,?,?,?,?,?,?,?)";
+            statement = connect.prepareStatement(sql);
+
 
             NxParser nxp = new NxParser();
             nxp.parse(in);
 
-
+            connect.setAutoCommit(false);
 
             for (Node[] nx : nxp) {
 
@@ -560,9 +580,19 @@ public void closeConnections()
 
 
             }
+            statement.executeBatch();
+            connect.commit();
+            statement.clearBatch();
+            statement.clearParameters();
 
         } catch (Exception e) {
             log.info(e.getMessage().toString());
+            try {
+                connect.rollback();
+            } catch (SQLException e1) {
+                e1.printStackTrace();
+            }
+
         } finally {
             try {
 

@@ -3,8 +3,7 @@ package de.unikoblenz.west.seastar.datapreparation;
 import com.google.common.base.Charsets;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Logger;
+
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
@@ -13,16 +12,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 
 import com.google.common.io.Files;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -47,7 +43,7 @@ public class CBTCLinkExtractorImpl implements LinkExtractor {
 
     HashMap<String, String> datasets = new HashMap<String, String>();
 
-    private static final Logger log = LoggerFactory.getLogger(CBTCLinkExtractorImpl.class);
+    private static final Logger log = LogManager.getLogger(CBTCLinkExtractorImpl.class);
 
     /**
      *
@@ -59,9 +55,6 @@ public class CBTCLinkExtractorImpl implements LinkExtractor {
      */
     public CBTCLinkExtractorImpl(String pathD, String pathC, String pathO, String pathE, String pathP) {
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
 
         this.filePath = pathD;
         this.cataloguePath = pathC;
@@ -103,8 +96,8 @@ public class CBTCLinkExtractorImpl implements LinkExtractor {
         for (CSVRecord record : records) {
 
 
-            Marker m = MarkerFactory.getMarker("debug");
-            log.isDebugEnabled(m);
+
+
             log.info("logging on");
 
             String datasetPLD = record.get("dataset");
@@ -244,7 +237,7 @@ public class CBTCLinkExtractorImpl implements LinkExtractor {
                         Files.append(ls, errors, Charsets.UTF_8);
                     } catch (IOException e1) {
                         e1.printStackTrace();
-                        System.out.println("a");
+                        //System.out.println("a");
                     }
 
                 }

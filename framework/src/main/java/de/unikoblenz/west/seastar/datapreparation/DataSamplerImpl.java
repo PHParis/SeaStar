@@ -1,16 +1,14 @@
 package de.unikoblenz.west.seastar.datapreparation;
 
 import de.unikoblenz.west.seastar.utils.ConfigurationManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
+
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Created by csarasua.
@@ -21,14 +19,12 @@ public class DataSamplerImpl implements DataSampler {
 
     // sample entities
     Connection connect;
-    private static final Logger log = LoggerFactory.getLogger(DataSamplerImpl.class);
+    private static final Logger log = LogManager.getLogger(DataSamplerImpl.class);
 
 
     public DataSamplerImpl() {
 
-        LogManager.getLogManager().reset();
-        SLF4JBridgeHandler.install();
-        java.util.logging.Logger.getLogger("global").setLevel(Level.WARNING);
+
 
         try {
             connect = DriverManager

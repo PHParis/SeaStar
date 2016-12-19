@@ -1,15 +1,20 @@
 package de.unikoblenz.west.seastar.model;
 
 
+import de.unikoblenz.west.seastar.launcher.Main;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
+import org.apache.jena.riot.Lang;
+import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.tdb.TDBFactory;
 import org.apache.jena.tdb.TDBLoader;
 import org.apache.jena.tdb.base.file.Location;
 import org.apache.jena.tdb.sys.TDBInternal;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -36,28 +41,29 @@ import com.hp.hpl.jena.tdb.TDBFactory;*/
 public class Dataset {
 
 
-
-
-
-
-        private String title; // as for searching
+    private String title; // as for searching
         private TypeOfDatasetLocation typeOfLocation;
         private String location; // can be the Path of a file or a SPARQL endpoint -
         // distinguished by file:/// if local otherwise
         // add tyoe of location
 
-        private String uriSpace;
+        private String uriSpace; // void: patterns for resource URIs e.g. http://dbpedia.org/resource/
         private String vocabulary; //locator
-        private String nameSpace;
+        private String nameSpace; // Given URI for the data set
 
         private Model model;
+        private org.apache.jena.query.Dataset dataset=null;
+
 
 
         String workingDir;
         String workingDirForFileName;
 
+    private static final Logger log= LogManager.getLogger(Dataset.class);
 
-        public Dataset(String title, TypeOfDatasetLocation typeLoc,
+
+
+    public Dataset(String title, TypeOfDatasetLocation typeLoc,
                        String loc, String uriSpa, String vocab, String ns) {
             try {
 
@@ -78,63 +84,38 @@ public class Dataset {
                 Model vocabularyModel = ModelFactory.createDefaultModel();
                 // Load the input data set into a model(file-based or DB-backend) only if it is a File, otherwise the queries are executed against the SPARQL Endpoint
 
-                if (this.typeOfLocation.equals(TypeOfDatasetLocation.FILEDUMP)) {
-
-                    this.model = ModelFactory.createDefaultModel();
-
-                    File f = new File(workingDirForFileName+location);
-                    long length = f.length();
-
-                    if (length < 5000000) { // if (length < 5000000) {
-
-                        //The data set dump file can be imported to an in-memory model
-
-                        if (location.startsWith("http://")) {
-                            model.read(location);
-                        } else {
-
-                            // model.read("file:///" + location);
-                            InputStream in;
-                            if (location.endsWith(".gz")) {
-                                in = new GZIPInputStream(new FileInputStream(location));
-                            } else {
-
-                                in = new FileInputStream(location);
-                            }
-                            // in = new BufferedInputStream(in);
+                File f = new File(location);
+              //  File f = new File(workingDirForFileName+location);
+                long length = f.length();
+                if(length >= 500000 || f.getAbsolutePath().endsWith("dbpedia-org.nq")) { //5000000
 
 
-                            model.read(in, null, "RDF/XML");
 
-                        }
+                    // TODO: file paths
+                    //String assemblerFile = "file:///C:/Users/csarasua/Documents/test-csarasua-vm/tdb.ttl";
 
+                    InputStream in;
+                    if (location.endsWith(".gz")) {
+                        in = new GZIPInputStream(new FileInputStream(location));
                     } else {
 
-
-
-                        // TODO: file paths
-                        //String assemblerFile = "file:///C:/Users/csarasua/Documents/test-csarasua-vm/tdb.ttl";
-
-                        InputStream in;
-                        if (location.endsWith(".gz")) {
-                            in = new GZIPInputStream(new FileInputStream(location));
-                        } else {
-
-                            in = new FileInputStream(workingDirForFileName+location);//FileManager.get().open(location);
-                        }
+                        in = new FileInputStream(location);//FileManager.get().open(location);
+                    }
 
 
 
 
-                        //-----------------------------------
+                    //-----------------------------------
 
 //Location.create ("target/TDB");
-                        Location location = Location.create(workingDirForFileName + "/TDB");
+                    Location location = Location.create(workingDirForFileName + "/TDB");
 
-                        // Load some initial data
-                        TDBLoader.load(TDBInternal.getBaseDatasetGraphTDB(TDBFactory.createDatasetGraph(location)), in, false);
-                        org.apache.jena.query.Dataset dataset = TDBFactory.createDataset(location);
+                    // Load some initial data
+                    TDBLoader.load(TDBInternal.getBaseDatasetGraphTDB(TDBFactory.createDatasetGraph(location)), in, false);
+                    this.dataset = TDBFactory.createDataset(location);
+                    //TODO CLEAN THIS PART TDB
 
+                    //dataset.getDefaultModel();
 
                     /*
                     //test querying with SPARQL
@@ -165,9 +146,51 @@ public class Dataset {
                     }*/
 
 
-                    }
+                }
+                else {
 
-              }
+                    if (this.typeOfLocation.equals(TypeOfDatasetLocation.FILEDUMP_NQ)) {
+                        this.dataset = RDFDataMgr.loadDataset(location, Lang.NQUADS);
+
+                    } else if (this.typeOfLocation.equals(TypeOfDatasetLocation.FILEDUMP)) {
+
+                        this.model = ModelFactory.createDefaultModel();
+
+
+                         // if (length < 5000000) {
+
+                            //The data set dump file can be imported to an in-memory model
+                            InputStream in;
+                            if (location.startsWith("http://")) {
+                                model.read(location);
+                            } else {
+
+                                // model.read("file:///" + location);
+
+                                if (location.endsWith(".gz")) {
+                                    in = new GZIPInputStream(new FileInputStream(location));
+                                } else {
+
+                                    in = new FileInputStream(location);
+                                }
+                                // in = new BufferedInputStream(in);
+
+
+                                if (location.endsWith(".rdf")) {
+                                    model.read(in, null, "RDF/XML");
+                                } else if (location.endsWith(".nt")) {
+                                    model.read(in, null, "N-Triples");
+                                }
+
+
+                            }
+
+
+
+
+                    }
+                }
+
 
                 //load the vocabulary -- should be done like before if too big store it in Db
 
@@ -189,7 +212,9 @@ public class Dataset {
                 }
 
             } catch (Exception e) {
-                e.printStackTrace();
+               // e.printStackTrace();
+                log.error("problem when creating / working a SeaStar Dataset");
+                log.error("reason",e);
             }
         }
 
@@ -264,6 +289,27 @@ public class Dataset {
         }
 
 
+        public org.apache.jena.query.Dataset getDataset() {
+        return dataset;
+    }
+
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Dataset dataset = (Dataset) o;
+
+        return title.equals(dataset.title);
+
+    }
+
+    @Override
+    public int hashCode() {
+        return title.hashCode();
+    }
 
 
 
