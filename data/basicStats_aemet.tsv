@@ -1,2 +1,0 @@
-dataset	numlinks	numsourcentities	linksets	avgtargetedentities	avglinkspersource	
-aemet	167	45	<<<(http://aemet.linkeddata.es/ontology/locatedIn,16>http://www.w3.org/1999/02/22-rdf-syntax-ns#type,81>http://www.w3.org/2000/01/rdf-schema#range,70>)	1.5111	3.7111	
