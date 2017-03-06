@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" shutdownHook="disable">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n" />
+        </Console>
+        <File name="File1" fileName="seastar.log" bufferedIO="false">
+        <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n" />
+        </File>
+    </Appenders>
+    <Loggers>
+        <!-- de.unikoblenz.west.seastar-->
+
+        <Logger name="de.unikoblenz.west.seastar.launcher" level="trace" >
+            <AppenderRef ref="File1" />
+        </Logger>
+        <Logger name="de.unikoblenz.west.seastar.datapreparation" level="trace" >
+            <AppenderRef ref="File1" />
+        </Logger>
+        <Logger name="de.unikoblenz.west.seastar.dataanalysis" level="trace" >
+            <AppenderRef ref="File1" />
+        </Logger>
+        <Logger name="de.unikoblenz.west.seastar.model" level="trace" >
+            <AppenderRef ref="File1" />
+        </Logger>
+        <Logger name="de.unikoblenz.west.seastar.utils" level="trace" >
+            <AppenderRef ref="File1" />
+        </Logger>
+
+        <Root level="error">
+            <AppenderRef ref="Console" />
+        </Root>
+    </Loggers>
+</Configuration>
